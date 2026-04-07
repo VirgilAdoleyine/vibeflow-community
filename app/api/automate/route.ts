@@ -10,6 +10,7 @@ import {
   appendLog,
 } from "@/lib/db/executions";
 import { getCurrentUser } from "@/lib/auth/user";
+import { getComposioSession } from "@/lib/integrations/composio";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import type { AgentStreamEvent } from "@/types/agent";
@@ -86,6 +87,11 @@ export async function POST(req: NextRequest) {
   const userApiKey = user.openrouter_api_key;
   const isFreeTier = !userApiKey;
   let executionId: string | null = null;
+
+  if (sessionId) {
+    await updateSessionOnExecution(sessionId, prompt).catch(() => {});
+  }
+
   try {
     const execution = await createExecution({
       user_id: userId,
@@ -93,10 +99,6 @@ export async function POST(req: NextRequest) {
       prompt,
     });
     executionId = execution.id;
-    
-    if (sessionId) {
-      await updateSessionOnExecution(sessionId, prompt);
-    }
   } catch {
   }
 
@@ -117,18 +119,48 @@ export async function POST(req: NextRequest) {
         await appendLog({ executionId, stage: "planning", message: "Started", detail: prompt });
       }
 
-      const providers: string[] = [];
-      const tokens = {};
+      const session = await getComposioSession(userId);
+      const providers = session?.connectedApps || [];
+      
+      // Get Composio tools for connected apps
+      let composioTools: any[] = [];
+      if (providers.length > 0) {
+        try {
+          const { Composio } = await import("@composio/core");
+          const { LangchainProvider } = await import("@composio/langchain");
+          
+          const composio = new Composio({
+            apiKey: process.env.COMPOSIO_API_KEY,
+            provider: new LangchainProvider(),
+          });
+          
+          // Get tools for each connected app
+          for (const app of providers) {
+            try {
+              const tools = await composio.tools.get("default", app.toUpperCase());
+              if (tools && tools.length > 0) {
+                composioTools = [...composioTools, ...tools];
+              }
+            } catch (toolErr) {
+              console.error(`[automate] Failed to get tools for ${app}:`, toolErr);
+            }
+          }
+        } catch (compErr) {
+          console.error("[automate] Composio init error:", compErr);
+        }
+      }
+      
       const memoryContext = await buildMemoryContext(userId, providers).catch(() => "");
 
       const eventStream = graph.streamEvents(
         { 
           user_prompt: prompt, 
           thread_id: threadId, 
-          integration_tokens: tokens, 
+          integration_tokens: {}, 
           memory_context: memoryContext,
           user_api_key: userApiKey,
-          is_free_tier: isFreeTier
+          is_free_tier: isFreeTier,
+          composio_tools: composioTools
         },
         { version: "v2" }
       );

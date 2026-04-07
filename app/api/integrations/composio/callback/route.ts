@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserId } from "@/lib/auth/user";
-import { getComposioSession, updateComposioSession } from "@/lib/integrations/composio";
+import { getComposioSession, createComposioSession, updateComposioSession } from "@/lib/integrations/composio";
 
 export const runtime = "nodejs";
 
@@ -22,10 +22,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(new URL(`/?error=integration_failed&message=${encodeURIComponent(error)}`, req.url));
     }
 
-    if (status === "connected" && connectionId) {
-      const session = await getComposioSession(userId);
-      if (session && appName && !session.connectedApps.includes(appName)) {
-        await updateComposioSession(userId, [...session.connectedApps, appName]);
+    if (status === "connected" && connectionId && appName) {
+      let session = await getComposioSession(userId);
+      if (session) {
+        const existingApps = session.connectedApps || [];
+        if (!existingApps.includes(appName)) {
+          await updateComposioSession(userId, [...existingApps, appName]);
+        }
+      } else {
+        await createComposioSession(userId, [appName]);
       }
       return NextResponse.redirect(new URL("/?success=integration_connected", req.url));
     }

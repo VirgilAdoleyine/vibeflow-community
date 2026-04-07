@@ -46,11 +46,11 @@ export async function verifyPassword(
 export function createSessionToken(user: { id: string; email: string }): string {
   const crypto = require("crypto");
   const payload = JSON.stringify({ id: user.id, email: user.email });
+  const encodedPayload = Buffer.from(payload).toString("base64");
   const signature = crypto
     .createHmac("sha256", JWT_SECRET)
-    .update(payload)
+    .update(encodedPayload)
     .digest("hex");
-  const encodedPayload = Buffer.from(JSON.stringify({ id: user.id, email: user.email })).toString("base64");
   return signature + "." + encodedPayload;
 }
 
@@ -60,15 +60,16 @@ export function verifySessionToken(token: string): { id: string; email: string }
     const parts = token.split(".");
     if (parts.length !== 2) return null;
     
-    const [payload, signature] = parts;
+    const [signature, encodedPayload] = parts;
     const expectedSignature = crypto
       .createHmac("sha256", JWT_SECRET)
-      .update(payload)
+      .update(encodedPayload)
       .digest("hex");
     
     if (signature !== expectedSignature) return null;
     
-    return JSON.parse(Buffer.from(payload, "base64").toString());
+    const payload = Buffer.from(encodedPayload, "base64").toString();
+    return JSON.parse(payload);
   } catch {
     return null;
   }

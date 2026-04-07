@@ -55,7 +55,7 @@ export default function HomePage() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
-  const [sidebarTab, setSidebarTab] = useState<"sessions" | "connectors">("sessions");
+  const [sidebarTab, setSidebarTab] = useState<"sessions" | "history" | "connectors">("sessions");
   const [viewMode, setViewMode] = useState<ViewMode>("timeline");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [pendingPlan, setPendingPlan] = useState<string[]>([]);
@@ -78,6 +78,10 @@ export default function HomePage() {
   const fetchSessions = async () => {
     try {
       const res = await fetch("/api/sessions");
+      if (res.status === 401) {
+        window.location.href = "/signin";
+        return;
+      }
       const data = await res.json();
       setSessions(data.sessions || []);
       if (data.sessions?.length > 0 && !currentSession) {
@@ -113,12 +117,18 @@ export default function HomePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: "New Workflow" }),
       });
+      if (res.status === 401) {
+        window.location.href = "/signin";
+        return;
+      }
       const data = await res.json();
-      setSessions((prev) => [data.session, ...prev]);
-      setCurrentSession(data.session);
-      setHistory([]);
-      setEvents([]);
-      setStage("idle");
+      if (data.session) {
+        setSessions((prev) => [data.session, ...prev]);
+        setCurrentSession(data.session);
+        setHistory([]);
+        setEvents([]);
+        setStage("idle");
+      }
     } catch (err) {
       console.error("Failed to create session:", err);
     }
@@ -306,10 +316,10 @@ export default function HomePage() {
 
         {/* Tab switcher */}
         <div className="flex border-b border-zinc-100 dark:border-zinc-800">
-          {(["sessions", "connectors"] as const).map((tab) => (
+          {(["sessions", "history", "connectors"] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setSidebarTab(tab)}
+              onClick={() => setSidebarTab(tab as typeof sidebarTab)}
               className={cn(
                 "flex-1 py-2.5 text-xs font-medium transition-colors",
                 sidebarTab === tab
@@ -320,6 +330,10 @@ export default function HomePage() {
               {tab === "sessions" ? (
                 <span className="flex items-center justify-center gap-1.5">
                   <Folder className="w-3 h-3" /> Workflows
+                </span>
+              ) : tab === "history" ? (
+                <span className="flex items-center justify-center gap-1.5">
+                  <History className="w-3 h-3" /> History
                 </span>
               ) : (
                 <span className="flex items-center justify-center gap-1.5">
@@ -345,13 +359,13 @@ export default function HomePage() {
                   No workflows yet. Create one to get started.
                 </p>
               ) : (
-                sessions.map((session) => (
+                sessions.filter(Boolean).map((session) => (
                   <button
                     key={session.id}
                     onClick={() => selectSession(session)}
                     className={cn(
                       "w-full text-left p-3 rounded-xl border transition-all",
-                      currentSession?.id === session.id
+                      currentSession?.id === session?.id
                         ? "border-zinc-900 dark:border-zinc-100 bg-zinc-100 dark:bg-zinc-800"
                         : "border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600 bg-white dark:bg-zinc-900"
                     )}
@@ -361,6 +375,30 @@ export default function HomePage() {
                     </p>
                     <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1">
                       {new Date(session.updated_at).toLocaleDateString()}
+                    </p>
+                  </button>
+                ))
+              )}
+            </div>
+          ) : sidebarTab === "history" ? (
+            <div className="space-y-2">
+              {history.length === 0 ? (
+                <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center py-8">
+                  No history yet. Run a workflow to see it here.
+                </p>
+              ) : (
+                history.filter(Boolean).map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleSubmit(item.prompt)}
+                    className="w-full text-left p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:border-zinc-400 dark:hover:border-zinc-600 transition-all"
+                  >
+                    <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">
+                      {item.prompt.slice(0, 50)}
+                      {item.prompt.length > 50 ? "..." : ""}
+                    </p>
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1">
+                      {item.stage} · {item.timestamp.toLocaleDateString()}
                     </p>
                   </button>
                 ))
@@ -489,7 +527,11 @@ export default function HomePage() {
             {/* Timeline view */}
             {hasContent && viewMode === "timeline" && (
               <div className="animate-slide-up">
-                <StatusFeed events={events} stage={stage} />
+                <StatusFeed 
+                  events={events} 
+                  stage={stage}
+                  onContinue={(prompt) => handleSubmit(prompt)}
+                />
               </div>
             )}
 

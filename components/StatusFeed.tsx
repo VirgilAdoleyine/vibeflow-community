@@ -20,6 +20,7 @@ import type { AgentStreamEvent, AgentStage } from "@/types/agent";
 interface StatusFeedProps {
   events: AgentStreamEvent[];
   stage: AgentStage;
+  onContinue?: (prompt: string) => void;
 }
 
 const STAGE_ICON: Record<string, React.ReactNode> = {
@@ -71,9 +72,15 @@ function PlanSteps({ plan }: { plan: string[] }) {
   );
 }
 
-function EventRow({ event, isLast }: { event: AgentStreamEvent; isLast: boolean }) {
+function EventRow({ event, isLast, onContinue }: { event: AgentStreamEvent; isLast: boolean; onContinue?: (prompt: string) => void }) {
   const isDone = event.stage === "done";
   const isError = event.stage === "error";
+
+  const handleContinue = () => {
+    const currentPrompt = event.message || "";
+    const newPrompt = currentPrompt + " (please fix the error and try again)";
+    onContinue?.(newPrompt);
+  };
 
   return (
     <div
@@ -130,12 +137,21 @@ function EventRow({ event, isLast }: { event: AgentStreamEvent; isLast: boolean 
             {event.error}
           </p>
         )}
+
+        {isError && onContinue && (
+          <button
+            onClick={handleContinue}
+            className="mt-2 px-3 py-1.5 text-xs font-medium bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg hover:opacity-90 transition-opacity"
+          >
+            Try again
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-export function StatusFeed({ events, stage }: StatusFeedProps) {
+export function StatusFeed({ events, stage, onContinue }: StatusFeedProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -161,6 +177,7 @@ export function StatusFeed({ events, stage }: StatusFeedProps) {
             key={i}
             event={event}
             isLast={i === events.length - 1}
+            onContinue={onContinue}
           />
         ))}
         <div ref={bottomRef} />

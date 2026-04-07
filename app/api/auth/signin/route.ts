@@ -33,22 +33,23 @@ export async function POST(req: NextRequest) {
 
     const sessionToken = createSessionToken({ id: user.id, email: user.email });
 
-    const cookieStore = await cookies();
-    cookieStore.set("session", sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      path: "/",
-    });
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       user: {
         id: user.id,
         email: user.email,
         openrouter_api_key: user.openrouter_api_key,
       },
     });
+
+    response.cookies.set("session", sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 30,
+      path: "/",
+    });
+
+    return response;
   } catch (err) {
     console.error("[auth/signin] Error:", err);
     return NextResponse.json(

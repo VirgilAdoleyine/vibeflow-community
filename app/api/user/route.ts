@@ -31,9 +31,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Invalid API key format" }, { status: 400 });
   }
   
-  if (openrouter_api_key) {
-    await updateUserApiKey(user.id, openrouter_api_key);
-  }
+  await updateUserApiKey(user.id, openrouter_api_key || "");
   
   return NextResponse.json({ ok: true });
 }

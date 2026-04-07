@@ -1,4 +1,5 @@
 import { Annotation } from "@langchain/langgraph";
+import type { StructuredToolInterface } from "@langchain/core/tools";
 
 export const AgentStateAnnotation = Annotation.Root({
   user_prompt: Annotation<string>(),
@@ -58,6 +59,12 @@ export const AgentStateAnnotation = Annotation.Root({
   memory_context: Annotation<string>({
     reducer: (_, b) => b ?? "",
     default: () => "",
+  }),
+
+  // Composio tools for connected apps
+  composio_tools: Annotation<StructuredToolInterface[]>({
+    reducer: (_, b) => b ?? [],
+    default: () => [],
   }),
 });
 

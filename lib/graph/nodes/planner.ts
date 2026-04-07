@@ -1,6 +1,6 @@
 import { getModel } from "@/lib/graph/factory";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { PLANNER_PROMPT } from "@/lib/prompts/planner";
+import { getPlannerPrompt } from "@/lib/prompts/planner";
 import { SYSTEM_PROMPT } from "@/lib/prompts/system";
 import type { AgentState } from "@/lib/graph/state";
 
@@ -10,9 +10,13 @@ export async function plannerNode(
   console.log("[planner] Building execution plan...");
 
   const model = getModel("planner", state.user_api_key, state.is_free_tier);
+  
+  // Get connected apps from composio_tools
+  const connectedApps = state.composio_tools?.map((t: any) => t?.name).filter(Boolean) || [];
+  const plannerPrompt = getPlannerPrompt(connectedApps);
 
   const response = await model.invoke([
-    new SystemMessage(SYSTEM_PROMPT + "\n\n" + PLANNER_PROMPT),
+    new SystemMessage(SYSTEM_PROMPT + "\n\n" + plannerPrompt),
     new HumanMessage(
       `User request: ${state.user_prompt}\n\nMemory context:\n${state.memory_context || "No previous executions found."}`
     ),

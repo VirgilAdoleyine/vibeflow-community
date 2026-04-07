@@ -22,7 +22,7 @@ export default function SignupPage() {
       return;
     }
 
-    if (!openrouterKey.startsWith("sk-or-")) {
+    if (openrouterKey && !openrouterKey.startsWith("sk-or-")) {
       setError("OpenRouter API key must start with 'sk-or-'");
       return;
     }
@@ -43,7 +43,17 @@ export default function SignupPage() {
         return;
       }
 
-      router.push("/signin?registered=true");
+      const res2 = await fetch("/api/auth/signin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      
+      if (res2.ok) {
+        router.push("/");
+      } else {
+        router.push("/signin?registered=true");
+      }
     } catch {
       setError("Something went wrong");
     } finally {
