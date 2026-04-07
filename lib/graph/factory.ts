@@ -15,17 +15,16 @@ export function getModel(role: Role, userApiKey: string | null = null, isFreeTie
     });
   }
 
-  // PAID TIER - Multi-model routing
+  // PAID TIER - All via OpenRouter with single API key
   const models: Record<Role, string> = {
-    // Claude: Primary for code generation from NLP
-    planner: "anthropic/claude-sonnet-4.6",
-    executor: "anthropic/claude-sonnet-4.6",
+    // Claude Sonnet 4.6: Primary for code generation from NLP
+    planner: "anthropic/claude-sonnet-4-20250514",
+    executor: "anthropic/claude-sonnet-4-20250514",
     
-    // Gemini: Validation, optimization, large context checks
-    // Also for UI/image/video analysis and Google ecosystem
+    // Gemini 3.1 Pro: Validation, optimization, large context, Google ecosystem
     reflector: "google/gemini-3.1-pro-preview",
     
-    // Claude: Fast formatting
+    // Claude Haiku: Fast formatting
     formatter: "anthropic/claude-haiku-3.5",
   };
 
@@ -36,22 +35,16 @@ export function getModel(role: Role, userApiKey: string | null = null, isFreeTie
     formatter: { temperature: 0 },
   };
 
-  const isGemini = role === "reflector";
-
   return new ChatOpenAI({
     modelName: models[role],
     configuration: {
-      baseURL: isGemini 
-        ? "https://generativelanguage.googleapis.com/v1beta/openai/"
-        : "https://openrouter.ai/api/v1",
-      apiKey: isGemini 
-        ? process.env.GEMINI_API_KEY 
-        : userApiKey,
+      baseURL: "https://openrouter.ai/api/v1",
       defaultHeaders: {
         "HTTP-Referer": "https://vibeflow.ai",
         "X-Title": "VibeFlow",
       },
     },
+    apiKey: userApiKey,
     maxTokens: modelConfig[role].maxTokens,
     temperature: modelConfig[role].temperature,
   });
