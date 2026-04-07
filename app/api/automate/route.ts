@@ -1,8 +1,6 @@
 import { NextRequest } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { graph } from "@/lib/graph";
-import { fetchUserTokens } from "@/lib/integrations/token";
-import { detectRequiredProviders } from "@/lib/integrations/token";
 import { buildMemoryContext } from "@/lib/db/memory";
 import { storeMemory } from "@/lib/db/memory";
 import {
@@ -19,24 +17,21 @@ const PROMPT_BLOCKLIST = [
   "exec(", "eval(", "import os", "import subprocess", "import sh", "system("
 ];
 
-// Optional: Upstash rate limiters (if configured)
 let ratelimit: Ratelimit | null = null;
 let freeTierLimit: Ratelimit | null = null;
 
 if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
   const redis = Redis.fromEnv();
   
-  // Per-IP spam protection
   ratelimit = new Ratelimit({
     redis,
-    limiter: Ratelimit.slidingWindow(10, "10 m"), // 10 req / 10 min
+    limiter: Ratelimit.slidingWindow(10, "10 m"),
     analytics: true,
   });
 
-  // Daily free tier cap
   freeTierLimit = new Ratelimit({
     redis,
-    limiter: Ratelimit.fixedWindow(5, "24 h"), // 5 req / 24 hours
+    limiter: Ratelimit.fixedWindow(5, "24 h"),
     prefix: "ratelimit_free",
     analytics: true,
   });
@@ -44,7 +39,6 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-// Anonymous user ID for demo mode (no auth required)
 const DEMO_USER_ID = "demo-user";
 
 function encode(event: AgentStreamEvent): string {
@@ -61,23 +55,21 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Security: Prompt blocklist
   const normalizedPrompt = prompt.toLowerCase();
   if (PROMPT_BLOCKLIST.some(term => normalizedPrompt.includes(term))) {
     return new Response(JSON.stringify({ error: "Security violation: Blocked command detected in prompt" }), {
-      status: 200, // Return 200 with error JSON instead of 403
+      status: 200,
       headers: { "Content-Type": "application/json" },
     });
   }
 
-  // Rate Limiting (per IP)
   if (ratelimit) {
     const ip = req.headers.get("x-forwarded-for") || "127.0.0.1";
     const { success, limit, reset, remaining } = await ratelimit.limit(ip);
     
     if (!success) {
       return new Response(JSON.stringify({ error: `Rate limit exceeded. Try again after ${new Date(reset).toLocaleTimeString()}.` }), {
-        status: 200, // Return 200 with error JSON instead of 429
+        status: 200,
         headers: {
           "Content-Type": "application/json",
           "X-RateLimit-Limit": limit.toString(),
@@ -90,11 +82,9 @@ export async function POST(req: NextRequest) {
   const userId = DEMO_USER_ID;
   const threadId = existingThreadId ?? uuidv4();
 
-  // BYOK: Read user's API key from header
   const userApiKey = req.headers.get("x-user-api-key");
   const isFreeTier = !userApiKey;
 
-  // Free Tier usage tracking (Vercel KV)
   if (isFreeTier && freeTierLimit) {
     const ip = req.headers.get("x-forwarded-for") || "127.0.0.1";
     const { success } = await freeTierLimit.limit(ip);
@@ -103,12 +93,11 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ 
         error: "Free tier limit reached. Please add an OpenRouter API key in settings to continue." 
       }), {
-        status: 200, // Return 200 with error JSON instead of 429
+        status: 200,
         headers: { "Content-Type": "application/json" },
       });
     }
   }
-  // Create execution record (best-effort — skip if no DB)
   let executionId: string | null = null;
   try {
     const execution = await createExecution({
@@ -118,7 +107,6 @@ export async function POST(req: NextRequest) {
     });
     executionId = execution.id;
   } catch {
-    // DB not configured — continue in stateless mode
   }
 
   const stream = new TransformStream();
@@ -129,7 +117,6 @@ export async function POST(req: NextRequest) {
     await writer.write(encoder.encode(encode(event)));
   };
 
-  // Run the agent in the background, streaming events back
   (async () => {
     try {
       await send({ stage: "planning", message: "Breaking down your request…" });
@@ -139,12 +126,10 @@ export async function POST(req: NextRequest) {
         await appendLog({ executionId, stage: "planning", message: "Started", detail: prompt });
       }
 
-      // Fetch tokens for detected integrations
-      const providers = detectRequiredProviders(prompt);
-      const tokens = await fetchUserTokens(userId).catch(() => ({}));
+      const providers: string[] = [];
+      const tokens = {};
       const memoryContext = await buildMemoryContext(userId, providers).catch(() => "");
 
-      // Stream graph events
       const eventStream = graph.streamEvents(
         { 
           user_prompt: prompt, 
@@ -221,7 +206,6 @@ export async function POST(req: NextRequest) {
               });
             }
 
-            // Store successful script in memory
             if (lastScript && providers.length > 0) {
               await storeMemory({
                 userId,

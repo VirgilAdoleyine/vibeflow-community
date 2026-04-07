@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Plug, PlugZap, RefreshCw, ExternalLink } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { RefreshCw, ExternalLink, Loader2, Search, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Integration } from "@/types/integration";
 
@@ -9,19 +9,48 @@ interface ConnectorListProps {
   className?: string;
 }
 
+const PROVIDER_TO_APP: Record<string, string> = {
+  slack: "slack",
+  hubspot: "hubspot",
+  notion: "notion",
+  gmail: "gmail",
+  airtable: "airtable",
+  googlesheets: "googlesheets",
+  googledrive: "googledrive",
+  googlecalendar: "googlecalendar",
+  github: "github",
+  salesforce: "salesforce",
+  jira: "jira",
+  discord: "discord",
+  calendly: "calendly",
+  trello: "trello",
+  asana: "asana",
+  outlook: "outlook",
+  supabase: "supabase",
+  apaleo: "apaleo",
+  attio: "attio",
+  basecamp: "basecamp",
+  boldsign: "boldsign",
+  blackbaud: "blackbaud",
+  googlesuper: "googlesuper",
+  discordbot: "discordbot",
+};
+
 export function ConnectorList({ className }: ConnectorListProps) {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const [connecting, setConnecting] = useState<string | null>(null);
 
   const fetchIntegrations = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/integrations");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setIntegrations(data.integrations ?? []);
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("[ConnectorList] Failed to fetch integrations:", err);
     } finally {
       setLoading(false);
     }
@@ -31,52 +60,45 @@ export function ConnectorList({ className }: ConnectorListProps) {
     fetchIntegrations();
   }, [fetchIntegrations]);
 
-  // Listen for Nango OAuth callback from popup
-  useEffect(() => {
-    const handler = (e: MessageEvent) => {
-      if (e.data?.type === "NANGO_CALLBACK") {
-        setConnecting(null);
-        fetchIntegrations();
-      }
-    };
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
-  }, [fetchIntegrations]);
+  const filteredIntegrations = useMemo(() => {
+    if (!searchQuery.trim()) return integrations;
+    const query = searchQuery.toLowerCase();
+    return integrations.filter(
+      (i) =>
+        i.display_name.toLowerCase().includes(query) ||
+        i.description.toLowerCase().includes(query) ||
+        i.provider.toLowerCase().includes(query)
+    );
+  }, [integrations, searchQuery]);
 
-  const handleConnect = async (integration: Integration) => {
-    const publicKey = process.env.NEXT_PUBLIC_NANGO_PUBLIC_KEY;
-    if (!publicKey) {
-      alert("Nango public key not configured. Set NEXT_PUBLIC_NANGO_PUBLIC_KEY in .env.local");
-      return;
-    }
-
+  const handleConnect = useCallback(async (integration: Integration) => {
+    const appName = PROVIDER_TO_APP[integration.provider] || integration.provider;
     setConnecting(integration.provider);
-    const appUrl = window.location.origin;
-    const url = `https://api.nango.dev/oauth/connect/${integration.provider}?public_key=${publicKey}&connection_id=demo-user&redirect_uri=${appUrl}/api/nango/callback`;
-
-    const popup = window.open(url, "nango-oauth", "width=500,height=700,menubar=no,toolbar=no");
-    if (!popup) {
-      alert("Popup blocked. Please allow popups for this site.");
+    try {
+      const res = await fetch("/api/integrations/composio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "authorize", appName }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.redirectUrl) {
+        window.location.href = data.redirectUrl;
+      }
+    } catch (err) {
+      console.error("[ConnectorList] Failed to connect:", err);
+    } finally {
       setConnecting(null);
     }
-  };
-
-  const handleDisconnect = async (integration: Integration) => {
-    try {
-      await fetch(`/api/integrations/${integration.provider}`, { method: "DELETE" });
-      fetchIntegrations();
-    } catch {
-      // silently fail
-    }
-  };
+  }, []);
 
   if (loading) {
     return (
-      <div className={cn("space-y-2", className)}>
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className={cn("space-y-3", className)}>
+        {Array.from({ length: 8 }).map((_, i) => (
           <div
             key={i}
-            className="h-14 rounded-xl bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+            className="h-20 rounded-xl bg-zinc-100 dark:bg-zinc-800 animate-pulse"
           />
         ))}
       </div>
@@ -84,11 +106,30 @@ export function ConnectorList({ className }: ConnectorListProps) {
   }
 
   return (
-    <div className={cn("space-y-2", className)}>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Connected apps
-        </h3>
+    <div className={cn("space-y-3", className)}>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+        <input
+          type="text"
+          placeholder="Search apps..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full h-9 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-lg pl-9 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 transition-all placeholder:text-zinc-400"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+          >
+            <X className="w-3 h-3 text-zinc-400" />
+          </button>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          {filteredIntegrations.length} apps
+        </p>
         <button
           onClick={fetchIntegrations}
           className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
@@ -98,91 +139,63 @@ export function ConnectorList({ className }: ConnectorListProps) {
         </button>
       </div>
 
-      {integrations.map((integration) => {
-        const isConnected = integration.status === "connected";
-        const isConnecting = connecting === integration.provider;
-
-        return (
+      <div className="grid grid-cols-2 gap-2">
+        {filteredIntegrations.map((integration) => (
           <div
             key={integration.id}
             className={cn(
-              "flex items-center gap-3 p-3 rounded-xl border transition-all",
-              isConnected
-                ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
-                : "border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-600"
+              "flex flex-col p-3 rounded-xl border transition-all",
+              "border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-600"
             )}
           >
-            {/* Icon */}
-            <span
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-lg flex-shrink-0"
-              style={{ backgroundColor: `${integration.color}18` }}
-            >
-              {integration.icon}
-            </span>
-
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100 leading-tight">
+            <div className="flex items-center gap-2 mb-2">
+              <span
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-base flex-shrink-0"
+                style={{ backgroundColor: `${integration.color}18` }}
+              >
+                {integration.icon}
+              </span>
+              <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100 truncate">
                 {integration.display_name}
               </p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
-                {integration.description}
-              </p>
             </div>
-
-            {/* Action */}
-            {isConnected ? (
-              <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                  <PlugZap className="w-3 h-3" />
-                  Live
-                </span>
-                <button
-                  onClick={() => handleDisconnect(integration)}
-                  className="text-xs text-zinc-400 hover:text-red-500 transition-colors ml-1"
-                >
-                  Disconnect
-                </button>
-              </div>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 mb-3 flex-1">
+              {integration.description}
+            </p>
+            {integration.status === "connected" ? (
+              <button
+                disabled
+                className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+              >
+                <Check className="w-3 h-3" />
+                Connected
+              </button>
             ) : (
               <button
                 onClick={() => handleConnect(integration)}
-                disabled={isConnecting}
-                className={cn(
-                  "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-all",
-                  "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900",
-                  "hover:bg-zinc-700 dark:hover:bg-zinc-100 active:scale-95",
-                  "disabled:opacity-50 disabled:cursor-not-allowed"
-                )}
+                disabled={connecting === integration.provider}
+                className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg text-xs font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 transition-opacity disabled:opacity-50"
               >
-                {isConnecting ? (
-                  <>
-                    <RefreshCw className="w-3 h-3 animate-spin" />
-                    Connecting…
-                  </>
+                {connecting === integration.provider ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
                 ) : (
-                  <>
-                    <Plug className="w-3 h-3" />
-                    Connect
-                  </>
+                  <ExternalLink className="w-3 h-3" />
                 )}
+                Connect
               </button>
             )}
           </div>
-        );
-      })}
+        ))}
+      </div>
+
+      {filteredIntegrations.length === 0 && (
+        <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center py-8">
+          No apps found matching "{searchQuery}"
+        </p>
+      )}
 
       <p className="text-xs text-zinc-400 dark:text-zinc-500 pt-1">
-        OAuth is handled by{" "}
-        <a
-          href="https://nango.dev"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline underline-offset-2 hover:text-zinc-600 dark:hover:text-zinc-300 inline-flex items-center gap-0.5"
-        >
-          Nango <ExternalLink className="w-2.5 h-2.5" />
-        </a>{" "}
-        — your credentials are never stored here.
+        Connect apps to enable automation
       </p>
     </div>
   );

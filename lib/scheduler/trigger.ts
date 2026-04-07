@@ -1,6 +1,5 @@
 import { inngest } from "./client";
 import { graph } from "@/lib/graph";
-import { fetchUserTokens } from "@/lib/integrations/token";
 import { buildMemoryContext } from "@/lib/db/memory";
 import {
   createExecution,
@@ -8,14 +7,14 @@ import {
   appendLog,
 } from "@/lib/db/executions";
 import { v4 as uuidv4 } from "uuid";
+import type { VibeFlowEvents } from "./client";
 
-/**
- * Run an automation on-demand (triggered from the API route).
- */
+type AutomationRunEvent = VibeFlowEvents["automation/run"];
+type AutomationScheduledEvent = VibeFlowEvents["automation/scheduled"];
+
 export const runAutomation = inngest.createFunction(
-  { id: "run-automation", name: "Run Automation" },
-  { event: "automation/run" },
-  async ({ event, step }) => {
+  { id: "run-automation", triggers: { event: "automation/run" } },
+  async ({ event, step }: { event: AutomationRunEvent; step: any }) => {
     const { userId, prompt, threadId, executionId } = event.data;
 
     await step.run("update-status-running", async () => {
@@ -29,11 +28,11 @@ export const runAutomation = inngest.createFunction(
     });
 
     const tokens = await step.run("fetch-tokens", async () => {
-      return fetchUserTokens(userId);
+      return {};
     });
 
     const memoryContext = await step.run("fetch-memory", async () => {
-      const providers = Object.keys(tokens);
+      const providers: string[] = [];
       return buildMemoryContext(userId, providers);
     });
 
@@ -63,14 +62,9 @@ export const runAutomation = inngest.createFunction(
   }
 );
 
-/**
- * Scheduled automation (cron-based).
- * Reads the schedule from DB and re-runs the stored prompt.
- */
 export const runScheduledAutomation = inngest.createFunction(
-  { id: "run-scheduled-automation", name: "Run Scheduled Automation" },
-  { event: "automation/scheduled" },
-  async ({ event, step }) => {
+  { id: "run-scheduled-automation", triggers: { event: "automation/scheduled" } },
+  async ({ event, step }: { event: AutomationScheduledEvent; step: any }) => {
     const { userId, prompt, scheduleId } = event.data;
     const threadId = uuidv4();
 
@@ -82,7 +76,6 @@ export const runScheduledAutomation = inngest.createFunction(
       });
     });
 
-    // Re-use the same run logic by sending a new event
     await step.sendEvent("trigger-run", {
       name: "automation/run",
       data: {

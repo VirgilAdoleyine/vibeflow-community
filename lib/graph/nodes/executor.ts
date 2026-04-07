@@ -15,13 +15,24 @@ Rules:
 - Keep scripts focused: one task per script
 - Return a dict with keys: "status", "data", "summary"
 
-Available tokens will be injected as environment variables:
-- SHOPIFY_TOKEN, SHOPIFY_DOMAIN for Shopify
-- SLACK_TOKEN for Slack  
-- HUBSPOT_TOKEN for HubSpot
-- NOTION_TOKEN for Notion
-- GMAIL_TOKEN for Gmail
-- AIRTABLE_TOKEN for Airtable
+Available tokens (will be injected as env vars):
+- SLACK_TOKEN for Slack (Bot User OAuth Token)
+- HUBSPOT_TOKEN for HubSpot (Private App Access Token)
+- NOTION_TOKEN for Notion (Internal Integration Token)
+- GMAIL_TOKEN for Gmail (OAuth2 access token)
+- AIRTABLE_TOKEN for Airtable (Personal Access Token)
+- GOOGLE_SHEETS_TOKEN for Google Sheets (OAuth2 access token)
+- GOOGLE_DRIVE_TOKEN for Google Drive (OAuth2 access token)
+- GOOGLE_CALENDAR_TOKEN for Google Calendar (OAuth2 access token)
+- GITHUB_TOKEN for GitHub (Personal Access Token)
+- SALESFORCE_TOKEN for Salesforce (Access Token)
+- JIRA_TOKEN for Jira (API Token)
+- DISCORD_TOKEN for Discord (Bot Token)
+- CALENDLY_TOKEN for Calendly (API Token)
+- TRELLO_TOKEN for Trello (API Key + Token)
+- ASANA_TOKEN for Asana (Personal Access Token)
+- OUTLOOK_TOKEN for Outlook (OAuth2 access token)
+- SUPABASE_URL, SUPABASE_KEY for Supabase
 
 Respond ONLY with the Python script inside a \`\`\`python block.`;
 

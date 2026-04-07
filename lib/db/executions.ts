@@ -15,15 +15,15 @@ export async function createExecution(
     INSERT INTO executions (user_id, thread_id, prompt, status, stage)
     VALUES (${input.user_id}, ${input.thread_id}, ${input.prompt}, 'pending', 'idle')
     RETURNING *
-  `;
-  return rows[0] as unknown as Execution;
+  ` as unknown as Execution[];
+  return rows[0];
 }
 
 export async function getExecution(id: string): Promise<Execution | null> {
   const rows = await sql`
     SELECT * FROM executions WHERE id = ${id} LIMIT 1
-  `;
-  return (rows[0] as unknown as Execution) ?? null;
+  ` as unknown as Execution[];
+  return rows[0] ?? null;
 }
 
 export async function updateExecution(

@@ -1,89 +1,47 @@
-import { getNangoClient } from "./client";
-import { SUPPORTED_INTEGRATIONS } from "@/types/integration";
-
-/**
- * Fetch all available integration tokens for a user.
- * Returns a map of { provider: accessToken }.
- * Silently skips any provider that isn't connected.
- */
 export async function fetchUserTokens(
-  userId: string
+  _userId: string
 ): Promise<Record<string, string>> {
-  const nango = getNangoClient();
-  const tokens: Record<string, string> = {};
-
-  await Promise.allSettled(
-    SUPPORTED_INTEGRATIONS.map(async ({ provider }) => {
-      try {
-        const connection = await nango.getConnection(provider, userId);
-        const credentials = connection?.credentials as
-          | { access_token?: string; token?: string; api_key?: string }
-          | undefined;
-
-        const token =
-          credentials?.access_token ||
-          credentials?.token ||
-          credentials?.api_key;
-
-        if (token) {
-          tokens[provider] = token;
-        }
-      } catch {
-        // Not connected — skip silently
-      }
-    })
-  );
-
-  return tokens;
+  return {};
 }
 
-/**
- * Fetch a token for a single provider.
- * Throws if not connected.
- */
 export async function fetchToken(
-  provider: string,
-  userId: string
+  _provider: string,
+  _userId: string
 ): Promise<string> {
-  const nango = getNangoClient();
-
-  const connection = await nango.getConnection(provider, userId);
-  const credentials = connection?.credentials as
-    | { access_token?: string; token?: string; api_key?: string }
-    | undefined;
-
-  const token =
-    credentials?.access_token || credentials?.token || credentials?.api_key;
-
-  if (!token) {
-    throw new Error(`No token found for provider: ${provider}`);
-  }
-
-  return token;
+  throw new Error("No token found");
 }
 
-/**
- * Detect which integrations a prompt likely needs,
- * so we only fetch the tokens we actually need.
- */
 export function detectRequiredProviders(prompt: string): string[] {
   const lower = prompt.toLowerCase();
-  const required: string[] = [];
-
+  
   const keywords: Record<string, string[]> = {
-    shopify: ["shopify", "order", "product", "customer", "store"],
-    slack: ["slack", "message", "channel", "notify", "post"],
+    slack: ["slack", "message", "channel", "notify", "post", "#"],
     hubspot: ["hubspot", "crm", "contact", "deal", "pipeline"],
     notion: ["notion", "page", "database", "doc"],
-    "google-mail": ["gmail", "email", "mail", "inbox"],
+    gmail: ["gmail", "email", "mail", "inbox"],
     airtable: ["airtable", "base", "table", "record"],
+    googlesheets: ["google sheets", "spreadsheet", "sheet"],
+    googledrive: ["google drive", "drive", "file", "folder"],
+    googlecalendar: ["google calendar", "calendar", "event", "meeting", "schedule"],
+    github: ["github", "issue", "pr", "pull request", "repo", "repository"],
+    salesforce: ["salesforce", "sfdc", "opportunity"],
+    jira: ["jira", "issue", "sprint", "project"],
+    discord: ["discord", "server", "channel"],
+    calendly: ["calendly", "meeting", "scheduling", "book"],
+    trello: ["trello", "board", "card", "list"],
+    asana: ["asana", "task", "project", "workspace"],
+    outlook: ["outlook", "office email", "microsoft email"],
+    supabase: ["supabase", "database", "db"],
+    apaleo: ["apaleo", "hotel", "booking"],
+    attio: ["attio", "crm"],
+    basecamp: ["basecamp", "todo"],
+    boldsign: ["boldsign", "esign", "signature"],
+    blackbaud: ["blackbaud", "nonprofit", "fundraising"],
+    googlesuper: ["google super", "super"],
+    discordbot: ["discord bot"],
   };
 
-  for (const [provider, terms] of Object.entries(keywords)) {
-    if (terms.some((term) => lower.includes(term))) {
-      required.push(provider);
-    }
-  }
-
-  return required;
+  return Object.entries(keywords)
+    .filter(([, terms]) => terms.some((term) => lower.includes(term)))
+    .map(([provider]) => provider);
 }

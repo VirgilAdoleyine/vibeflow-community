@@ -12,11 +12,14 @@ interface CommandBarProps {
 }
 
 const EXAMPLE_PROMPTS = [
-  "Get my last 10 Shopify orders and post a summary to #sales in Slack",
-  "Find all HubSpot contacts added this week and create a Notion table",
+  "Summarize my unread Slack messages",
+  "Sync new HubSpot contacts to Notion",
   "Send me a Gmail digest of unread emails from the last 24 hours",
-  "Fetch all open Shopify orders over $200 and check if customers are in HubSpot",
-  "Pull this week's Airtable records and summarise them in Slack",
+  "Pull Airtable records and summarize them in Slack",
+  "Add a new row to Google Sheets with today's tasks",
+  "List files from my Google Drive",
+  "Check my Google Calendar for today",
+  "Create a new GitHub issue",
 ];
 
 export function CommandBar({ onSubmit, stage, disabled }: CommandBarProps) {

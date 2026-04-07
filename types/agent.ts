@@ -19,6 +19,8 @@ export interface AgentState {
   retry_count: number;
   integration_tokens: Record<string, string>;
   memory_context: string;
+  composio_session_id?: string;
+  active_apps: string[];
 }
 
 export interface AgentStreamEvent {

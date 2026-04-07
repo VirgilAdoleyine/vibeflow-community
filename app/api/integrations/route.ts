@@ -1,41 +1,39 @@
-import { NextRequest } from "next/server";
-import { getNangoClient } from "@/lib/integrations/client";
+import { NextRequest, NextResponse } from "next/server";
+import { getConnectedProviders, deleteConnection } from "@/lib/integrations/client";
+import { getCurrentUserId } from "@/lib/auth/user";
 import { SUPPORTED_INTEGRATIONS } from "@/types/integration";
 
 export const runtime = "nodejs";
 
 export async function GET(_req: NextRequest) {
-  const userId = "demo-user";
+  const userId = await getCurrentUserId();
+  const connectedProviders = userId ? await getConnectedProviders(userId) : [];
+  
+  return NextResponse.json({
+    integrations: SUPPORTED_INTEGRATIONS.map((i) => ({
+      ...i,
+      status: connectedProviders.includes(i.provider) ? "connected" : "disconnected",
+    })),
+  });
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ provider: string }> }
+) {
+  const { provider } = await params;
+  if (!provider) {
+    return NextResponse.json({ error: "provider is required" }, { status: 400 });
+  }
 
   try {
-    const nango = getNangoClient();
-    const response = await nango.listConnections();
-    const connections =
-      (response as { configs?: { provider_config_key: string; connection_id: string }[] })
-        ?.configs ?? [];
-
-    const userConnections = connections
-      .filter((c) => c.connection_id === userId)
-      .map((c) => c.provider_config_key);
-
-    const integrations = SUPPORTED_INTEGRATIONS.map((integration) => ({
-      ...integration,
-      status: userConnections.includes(integration.provider)
-        ? "connected"
-        : "disconnected",
-    }));
-
-    return new Response(JSON.stringify({ integrations }), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch {
-    // Nango not configured — return all as disconnected
-    const integrations = SUPPORTED_INTEGRATIONS.map((i) => ({
-      ...i,
-      status: "disconnected",
-    }));
-    return new Response(JSON.stringify({ integrations }), {
-      headers: { "Content-Type": "application/json" },
-    });
+    await deleteConnection(provider, "");
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error(`[api/integrations] Failed to delete connection for ${provider}:`, err);
+    return NextResponse.json(
+      { error: "Failed to disconnect integration" },
+      { status: 500 }
+    );
   }
 }

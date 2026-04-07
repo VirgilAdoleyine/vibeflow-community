@@ -62,7 +62,7 @@ function ResultPreview({ result }: { result: unknown }) {
 export const AutomationNode = memo(function AutomationNode({
   data,
 }: NodeProps) {
-  const d = data as AutomationNodeData;
+  const d = data as unknown as AutomationNodeData;
   const [showScript, setShowScript] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -101,7 +101,7 @@ export const AutomationNode = memo(function AutomationNode({
 
       {/* Header */}
       <div className="flex items-start gap-2.5 px-4 pt-4 pb-3">
-        <div className="mt-0.5 flex-shrink-0">{STATUS_ICON[d.status]}</div>
+        <div className="mt-0.5 flex-shrink-0">{STATUS_ICON[d.status as NodeStatus]}</div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">

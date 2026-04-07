@@ -20,11 +20,14 @@ import { cn } from "@/lib/utils";
 import type { AgentStreamEvent, AgentStage } from "@/types/agent";
 
 const EXAMPLE_PROMPTS = [
-  "Get the last 10 Shopify orders",
   "Summarize unread Slack messages",
   "Sync new HubSpot contacts to Notion",
   "Draft a reply to my latest Gmail",
-  "List items from my Airtable inventory",
+  "List items from my Airtable base",
+  "Create a new row in Google Sheets",
+  "Get files from my Google Drive",
+  "Check my Google Calendar for today",
+  "List open GitHub issues",
 ];
 interface HistoryItem {
   id: string;
