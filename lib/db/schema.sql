@@ -4,6 +4,30 @@
 -- Enable pgvector for integration memory embeddings
 CREATE EXTENSION IF NOT EXISTS vector;
 
+-- ─── Users ───────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS users (
+  id                 TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  email              TEXT UNIQUE NOT NULL,
+  password_hash      TEXT NOT NULL,
+  openrouter_api_key TEXT,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS users_email_idx ON users(email);
+
+-- ─── Sessions (Chat Workflows) ─────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS sessions (
+  id         TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title      TEXT NOT NULL DEFAULT 'New Workflow',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS sessions_updated_at_idx ON sessions(updated_at DESC);
+
 -- ─── Executions ──────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS executions (
   id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,

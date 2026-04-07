@@ -8,6 +8,7 @@ import {
   updateExecution,
   appendLog,
 } from "@/lib/db/executions";
+import { getCurrentUser } from "@/lib/auth/user";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import type { AgentStreamEvent } from "@/types/agent";
@@ -18,7 +19,6 @@ const PROMPT_BLOCKLIST = [
 ];
 
 let ratelimit: Ratelimit | null = null;
-let freeTierLimit: Ratelimit | null = null;
 
 if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
   const redis = Redis.fromEnv();
@@ -28,18 +28,9 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
     limiter: Ratelimit.slidingWindow(10, "10 m"),
     analytics: true,
   });
-
-  freeTierLimit = new Ratelimit({
-    redis,
-    limiter: Ratelimit.fixedWindow(5, "24 h"),
-    prefix: "ratelimit_free",
-    analytics: true,
-  });
 }
 export const runtime = "nodejs";
 export const maxDuration = 300;
-
-const DEMO_USER_ID = "demo-user";
 
 function encode(event: AgentStreamEvent): string {
   return `data: ${JSON.stringify(event)}\n\n`;
@@ -63,6 +54,14 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  const user = await getCurrentUser();
+  if (!user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   if (ratelimit) {
     const ip = req.headers.get("x-forwarded-for") || "127.0.0.1";
     const { success, limit, reset, remaining } = await ratelimit.limit(ip);
@@ -79,25 +78,12 @@ export async function POST(req: NextRequest) {
       });
     }
   }
-  const userId = DEMO_USER_ID;
+  
+  const userId = user.id;
   const threadId = existingThreadId ?? uuidv4();
 
-  const userApiKey = req.headers.get("x-user-api-key");
+  const userApiKey = user.openrouter_api_key;
   const isFreeTier = !userApiKey;
-
-  if (isFreeTier && freeTierLimit) {
-    const ip = req.headers.get("x-forwarded-for") || "127.0.0.1";
-    const { success } = await freeTierLimit.limit(ip);
-    
-    if (!success) {
-      return new Response(JSON.stringify({ 
-        error: "Free tier limit reached. Please add an OpenRouter API key in settings to continue." 
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-  }
   let executionId: string | null = null;
   try {
     const execution = await createExecution({

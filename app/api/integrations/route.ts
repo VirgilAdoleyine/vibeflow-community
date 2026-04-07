@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getConnectedProviders, deleteConnection } from "@/lib/integrations/client";
+import { getConnectedProviders } from "@/lib/integrations/client";
 import { getCurrentUserId } from "@/lib/auth/user";
 import { SUPPORTED_INTEGRATIONS } from "@/types/integration";
 
@@ -15,6 +15,23 @@ export async function GET(_req: NextRequest) {
       status: connectedProviders.includes(i.provider) ? "connected" : "disconnected",
     })),
   });
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ provider: string }> }
+) {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { provider } = await params;
+  if (!provider) {
+    return NextResponse.json({ error: "provider is required" }, { status: 400 });
+  }
+
+  return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(

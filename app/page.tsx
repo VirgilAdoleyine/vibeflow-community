@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   Zap,
   History,
@@ -9,6 +9,9 @@ import {
   RotateCcw,
   LayoutGrid,
   List,
+  Plus,
+  LogOut,
+  Folder,
 } from "lucide-react";
 import { CommandBar } from "@/components/CommandBar";
 import { StatusFeed } from "@/components/StatusFeed";
@@ -29,6 +32,13 @@ const EXAMPLE_PROMPTS = [
   "Check my Google Calendar for today",
   "List open GitHub issues",
 ];
+
+interface Session {
+  id: string;
+  title: string;
+  updated_at: string;
+}
+
 interface HistoryItem {
   id: string;
   prompt: string;
@@ -43,7 +53,9 @@ export default function HomePage() {
   const [stage, setStage] = useState<AgentStage>("idle");
   const [events, setEvents] = useState<AgentStreamEvent[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [sidebarTab, setSidebarTab] = useState<"connectors" | "history">("connectors");
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [currentSession, setCurrentSession] = useState<Session | null>(null);
+  const [sidebarTab, setSidebarTab] = useState<"sessions" | "connectors">("sessions");
   const [viewMode, setViewMode] = useState<ViewMode>("timeline");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [pendingPlan, setPendingPlan] = useState<string[]>([]);
@@ -52,6 +64,65 @@ export default function HomePage() {
   
   const abortRef = useRef<AbortController | null>(null);
   const runIdRef = useRef<string>("");
+
+  useEffect(() => {
+    fetchSessions();
+    fetchHistory();
+  }, []);
+
+  const fetchSessions = async () => {
+    try {
+      const res = await fetch("/api/sessions");
+      const data = await res.json();
+      setSessions(data.sessions || []);
+      if (data.sessions?.length > 0 && !currentSession) {
+        setCurrentSession(data.sessions[0]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch sessions:", err);
+    }
+  };
+
+  const fetchHistory = async () => {
+    try {
+      const res = await fetch("/api/executions");
+      const data = await res.json();
+      setHistory(
+        (data.executions || []).map((e: any) => ({
+          id: e.id,
+          prompt: e.prompt,
+          output: e.output || "",
+          stage: e.stage as AgentStage,
+          timestamp: new Date(e.created_at),
+        }))
+      );
+    } catch (err) {
+      console.error("Failed to fetch history:", err);
+    }
+  };
+
+  const createNewSession = async () => {
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "New Workflow" }),
+      });
+      const data = await res.json();
+      setSessions((prev) => [data.session, ...prev]);
+      setCurrentSession(data.session);
+      setHistory([]);
+      setEvents([]);
+      setStage("idle");
+    } catch (err) {
+      console.error("Failed to create session:", err);
+    }
+  };
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/signin";
+  };
 
   const startAutomationExecution = useCallback(
     async (prompt: string, stepIndex?: number, patchedScript?: string) => {
@@ -226,7 +297,7 @@ export default function HomePage() {
 
         {/* Tab switcher */}
         <div className="flex border-b border-zinc-100 dark:border-zinc-800">
-          {(["connectors", "history"] as const).map((tab) => (
+          {(["sessions", "connectors"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setSidebarTab(tab)}
@@ -237,13 +308,13 @@ export default function HomePage() {
                   : "text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300"
               )}
             >
-              {tab === "connectors" ? (
+              {tab === "sessions" ? (
                 <span className="flex items-center justify-center gap-1.5">
-                  <Settings className="w-3 h-3" /> Apps
+                  <Folder className="w-3 h-3" /> Workflows
                 </span>
               ) : (
                 <span className="flex items-center justify-center gap-1.5">
-                  <History className="w-3 h-3" /> History
+                  <Settings className="w-3 h-3" /> Apps
                 </span>
               )}
             </button>
@@ -252,42 +323,53 @@ export default function HomePage() {
 
         {/* Tab content */}
         <div className="flex-1 overflow-y-auto p-4">
-          {sidebarTab === "connectors" ? (
-            <ConnectorList />
-          ) : (
+          {sidebarTab === "sessions" ? (
             <div className="space-y-2">
-              {history.length === 0 ? (
+              <button
+                onClick={createNewSession}
+                className="w-full flex items-center justify-center gap-2 p-2 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:border-zinc-400 transition-all"
+              >
+                <Plus className="w-3 h-3" /> New Workflow
+              </button>
+              {sessions.length === 0 ? (
                 <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center py-8">
-                  No runs yet.
+                  No workflows yet. Create one to get started.
                 </p>
               ) : (
-                history.map((item) => (
+                sessions.map((session) => (
                   <button
-                    key={item.id}
-                    onClick={() => handleSubmit(item.prompt)}
-                    className="w-full text-left p-3 rounded-xl border border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600 bg-white dark:bg-zinc-900 transition-all group"
+                    key={session.id}
+                    onClick={() => setCurrentSession(session)}
+                    className={cn(
+                      "w-full text-left p-3 rounded-xl border transition-all",
+                      currentSession?.id === session.id
+                        ? "border-zinc-900 dark:border-zinc-100 bg-zinc-100 dark:bg-zinc-800"
+                        : "border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600 bg-white dark:bg-zinc-900"
+                    )}
                   >
                     <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">
-                      {item.prompt}
+                      {session.title}
                     </p>
-                    <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 truncate">
-                      {item.output}
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1">
+                      {new Date(session.updated_at).toLocaleDateString()}
                     </p>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-[10px] text-zinc-300 dark:text-zinc-600">
-                        {item.timestamp.toLocaleTimeString()}
-                      </span>
-                      <ChevronRight className="w-3 h-3 text-zinc-300 dark:text-zinc-600 group-hover:text-zinc-500 transition-colors" />
-                    </div>
                   </button>
                 ))
               )}
             </div>
+          ) : (
+            <ConnectorList />
           )}
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-zinc-100 dark:border-zinc-800">
+        {/* User footer */}
+        <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 p-2 rounded-xl text-xs text-zinc-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+          >
+            <LogOut className="w-3 h-3" /> Sign Out
+          </button>
           <p className="text-[10px] text-zinc-400 dark:text-zinc-600 text-center">
             Powered by LangGraph · E2B · Neon
           </p>

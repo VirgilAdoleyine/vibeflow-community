@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings, Key, X, Check, ExternalLink } from "lucide-react";
+import { Settings, Key, X, Check, Loader2, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SettingsModalProps {
@@ -12,34 +12,58 @@ interface SettingsModalProps {
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [apiKey, setApiKey] = useState("");
   const [isSaved, setIsSaved] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const savedKey = localStorage.getItem("openrouter_api_key");
-    if (savedKey) setApiKey(savedKey);
-  }, []);
+    if (isOpen) {
+      fetchUser();
+    }
+  }, [isOpen]);
 
-  const handleSave = () => {
-    localStorage.setItem("openrouter_api_key", apiKey);
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 2000);
+  const fetchUser = async () => {
+    try {
+      const res = await fetch("/api/user");
+      const data = await res.json();
+      if (data.user) {
+        setUser(data.user);
+        if (data.user.openrouter_api_key) {
+          setApiKey(data.user.openrouter_api_key);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch user:", err);
+    }
   };
 
-  const handleClear = () => {
-    localStorage.removeItem("openrouter_api_key");
-    setApiKey("");
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/user", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ openrouter_api_key: apiKey }),
+      });
+      if (res.ok) {
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 2000);
+      }
+    } catch (err) {
+      console.error("Failed to save:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-zinc-950/40 backdrop-blur-sm" 
         onClick={onClose}
       />
       
-      {/* Modal */}
       <div className="relative w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 p-6 animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
@@ -57,6 +81,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </div>
 
         <div className="space-y-6">
+          <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Signed in as <span className="font-medium text-zinc-700 dark:text-zinc-300">{user?.email}</span>
+            </p>
+          </div>
+
           <div className="space-y-2">
             <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
               OpenRouter API Key
@@ -72,8 +102,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               />
             </div>
             <p className="text-[10px] text-zinc-400 leading-relaxed">
-              VibeFlow is powered by Claude 3.5 Sonnet on OpenRouter. 
-              Leave blank to use the free tier (limited runs). Keys are stored locally in your browser.
+              Get a key at openrouter.ai — required to use the automation features.
             </p>
           </div>
 
@@ -89,6 +118,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <div className="flex items-center gap-2 pt-4">
             <button
               onClick={handleSave}
+              disabled={loading}
               className={cn(
                 "flex-1 h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all",
                 isSaved 
@@ -96,13 +126,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   : "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 active:scale-[0.98]"
               )}
             >
-              {isSaved ? <><Check className="w-4 h-4" /> Saved</> : "Save Preferences"}
-            </button>
-            <button
-              onClick={handleClear}
-              className="px-4 h-11 rounded-xl text-xs font-medium text-zinc-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
-            >
-              Clear
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : isSaved ? <><Check className="w-4 h-4" /> Saved</> : "Save"}
             </button>
           </div>
         </div>

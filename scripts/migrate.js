@@ -6,7 +6,17 @@ const fs = require("fs");
 const path = require("path");
 
 async function migrate() {
-  const databaseUrl = process.env.DATABASE_URL;
+  // Try to read from .env.local
+  let databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    const envPath = path.join(__dirname, "../.env.local");
+    const envContent = fs.readFileSync(envPath, "utf-8");
+    const match = envContent.match(/^DATABASE_URL=(.+)$/m);
+    if (match) {
+      databaseUrl = match[1].trim();
+    }
+  }
+  
   if (!databaseUrl) {
     console.error("❌  DATABASE_URL is not set. Copy .env.example to .env.local and fill it in.");
     process.exit(1);
