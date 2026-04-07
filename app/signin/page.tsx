@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Zap, Lock, Mail, AlertCircle, Loader2 } from "lucide-react";
 
-export default function SigninPage() {
+function SigninForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const registered = searchParams.get("registered");
@@ -116,5 +116,13 @@ export default function SigninPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function SigninPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-zinc-950" />}>
+      <SigninForm />
+    </Suspense>
   );
 }

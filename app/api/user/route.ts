@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, updateUserApiKey } from "@/lib/auth/user";
+import { getCurrentUser } from "@/lib/auth/user";
+import { updateUserApiKey } from "@/lib/db/user";
 
 export const runtime = "nodejs";
 

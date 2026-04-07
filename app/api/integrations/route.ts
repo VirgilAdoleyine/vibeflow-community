@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getConnectedProviders } from "@/lib/integrations/client";
+import { getConnectedProviders, deleteConnection } from "@/lib/integrations/client";
 import { getCurrentUserId } from "@/lib/auth/user";
 import { SUPPORTED_INTEGRATIONS } from "@/types/integration";
 
@@ -31,20 +31,8 @@ export async function DELETE(
     return NextResponse.json({ error: "provider is required" }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true });
-}
-
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: Promise<{ provider: string }> }
-) {
-  const { provider } = await params;
-  if (!provider) {
-    return NextResponse.json({ error: "provider is required" }, { status: 400 });
-  }
-
   try {
-    await deleteConnection(provider, "");
+    await deleteConnection(provider, userId);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error(`[api/integrations] Failed to delete connection for ${provider}:`, err);

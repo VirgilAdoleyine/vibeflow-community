@@ -5,10 +5,11 @@ export const runtime = "nodejs";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const execution = await getExecution(params.id);
+    const { id } = await params;
+    const execution = await getExecution(id);
     if (!execution) {
       return new Response(JSON.stringify({ error: "Not found" }), {
         status: 404,
@@ -16,7 +17,7 @@ export async function GET(
       });
     }
 
-    const logs = await getExecutionLogs(params.id);
+    const logs = await getExecutionLogs(id);
 
     return new Response(JSON.stringify({ execution, logs }), {
       headers: { "Content-Type": "application/json" },

@@ -103,7 +103,7 @@ function buildNodes(
         stepIndex: i,
         label,
         script: sd.script ?? "",
-        result: sd.result ?? null,
+        result: sd.result ? String(sd.result).slice(0, 200) : null,
         error: sd.error,
         status,
         onRerun,

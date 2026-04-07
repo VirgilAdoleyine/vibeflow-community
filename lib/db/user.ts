@@ -43,13 +43,15 @@ export async function verifyPassword(
   return hashPassword(password) === hash;
 }
 
-export function createSessionToken(user: UserSession): string {
+export function createSessionToken(user: { id: string; email: string }): string {
   const crypto = require("crypto");
   const payload = JSON.stringify({ id: user.id, email: user.email });
-  return crypto
+  const signature = crypto
     .createHmac("sha256", JWT_SECRET)
     .update(payload)
     .digest("hex");
+  const encodedPayload = Buffer.from(JSON.stringify({ id: user.id, email: user.email })).toString("base64");
+  return signature + "." + encodedPayload;
 }
 
 export function verifySessionToken(token: string): { id: string; email: string } | null {
