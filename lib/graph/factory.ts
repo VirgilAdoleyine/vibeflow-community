@@ -18,14 +18,14 @@ export function getModel(role: Role, userApiKey: string | null = null, isFreeTie
   // PAID TIER - All via OpenRouter with single API key
   const models: Record<Role, string> = {
     // Claude Sonnet 4.6: Primary for code generation from NLP
-    planner: "anthropic/claude-sonnet-4-20250514",
-    executor: "anthropic/claude-sonnet-4-20250514",
+    planner: "anthropic/claude-sonnet-4.6",
+    executor: "anthropic/claude-sonnet-4.6",
     
     // Gemini 3.1 Pro: Validation, optimization, large context, Google ecosystem
     reflector: "google/gemini-3.1-pro-preview",
     
-    // Claude Haiku: Fast formatting
-    formatter: "anthropic/claude-haiku-3.5",
+    // Claude Haiku 4.5: Fast formatting
+    formatter: "anthropic/claude-haiku-4.5",
   };
 
   const modelConfig: Record<Role, { temperature: number; maxTokens?: number }> = {
