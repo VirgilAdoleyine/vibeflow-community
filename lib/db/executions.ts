@@ -66,6 +66,20 @@ export async function listExecutions(
   return rows as unknown as Execution[];
 }
 
+export async function listExecutionsBySession(
+  sessionId: string,
+  userId: string,
+  limit = 50
+): Promise<Execution[]> {
+  const rows = await sql`
+    SELECT * FROM executions
+    WHERE thread_id = ${sessionId} AND user_id = ${userId}
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows as unknown as Execution[];
+}
+
 // ─── Execution Logs ──────────────────────────────────────────────────────────
 
 export async function appendLog(params: {

@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { graph } from "@/lib/graph";
 import { buildMemoryContext } from "@/lib/db/memory";
 import { storeMemory } from "@/lib/db/memory";
+import { updateSessionOnExecution } from "@/lib/db/sessions";
 import {
   createExecution,
   updateExecution,
@@ -37,7 +38,7 @@ function encode(event: AgentStreamEvent): string {
 }
 
 export async function POST(req: NextRequest) {
-  const { prompt, threadId: existingThreadId } = await req.json();
+  const { prompt, threadId: existingThreadId, sessionId } = await req.json();
 
   if (!prompt?.trim()) {
     return new Response(JSON.stringify({ error: "prompt is required" }), {
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
   }
   
   const userId = user.id;
-  const threadId = existingThreadId ?? uuidv4();
+  const threadId = existingThreadId || sessionId || uuidv4();
 
   const userApiKey = user.openrouter_api_key;
   const isFreeTier = !userApiKey;
@@ -92,6 +93,10 @@ export async function POST(req: NextRequest) {
       prompt,
     });
     executionId = execution.id;
+    
+    if (sessionId) {
+      await updateSessionOnExecution(sessionId, prompt);
+    }
   } catch {
   }
 

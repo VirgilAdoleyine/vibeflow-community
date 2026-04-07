@@ -67,8 +67,13 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchSessions();
-    fetchHistory();
   }, []);
+
+  useEffect(() => {
+    if (currentSession) {
+      fetchSessionHistory(currentSession.id);
+    }
+  }, [currentSession]);
 
   const fetchSessions = async () => {
     try {
@@ -83,9 +88,9 @@ export default function HomePage() {
     }
   };
 
-  const fetchHistory = async () => {
+  const fetchSessionHistory = async (sessionId: string) => {
     try {
-      const res = await fetch("/api/executions");
+      const res = await fetch(`/api/executions?sessionId=${sessionId}`);
       const data = await res.json();
       setHistory(
         (data.executions || []).map((e: any) => ({
@@ -119,6 +124,11 @@ export default function HomePage() {
     }
   };
 
+  const selectSession = (session: Session) => {
+    setCurrentSession(session);
+    fetchSessionHistory(session.id);
+  };
+
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/signin";
@@ -130,8 +140,6 @@ export default function HomePage() {
       abortRef.current = new AbortController();
       const runId = Date.now().toString();
       runIdRef.current = runId;
-
-      const userApiKey = localStorage.getItem("openrouter_api_key") || "";
 
       if (stepIndex !== undefined) {
         setEvents((prev) => {
@@ -145,17 +153,18 @@ export default function HomePage() {
       setStage("planning");
 
       try {
-        const body =
+        const body: any =
           stepIndex !== undefined && patchedScript
             ? { prompt, stepIndex, patchedScript }
             : { prompt };
+        
+        if (currentSession) {
+          body.sessionId = currentSession.id;
+        }
 
         const res = await fetch("/api/automate", {
           method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            ...(userApiKey ? { "x-user-api-key": userApiKey } : {})
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
           signal: abortRef.current.signal,
         });
@@ -339,7 +348,7 @@ export default function HomePage() {
                 sessions.map((session) => (
                   <button
                     key={session.id}
-                    onClick={() => setCurrentSession(session)}
+                    onClick={() => selectSession(session)}
                     className={cn(
                       "w-full text-left p-3 rounded-xl border transition-all",
                       currentSession?.id === session.id
