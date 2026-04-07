@@ -1,5 +1,5 @@
 import { getModel } from "@/lib/graph/factory";
-import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { runInSandbox } from "@/lib/sandbox/runner";
 import { SYSTEM_PROMPT } from "@/lib/prompts/system";
@@ -89,13 +89,13 @@ export async function executorNode(
     const modelWithTools = model.bindTools(composio_tools);
     
     // Build messages
-    const messages = [
+    const messages: any[] = [
       new SystemMessage(TOOL_USE_PROMPT),
       new HumanMessage(currentStep),
     ];
     
     if (sandbox_result) {
-      messages.push(new AIMessage(`Previous result: ${JSON.stringify(sandbox_result).slice(0, 500)}`));
+      messages.push(new HumanMessage(`Previous result: ${JSON.stringify(sandbox_result).slice(0, 500)}`));
     }
     
     // Invoke model with tools
@@ -108,7 +108,7 @@ export async function executorNode(
       // Run tools
       const toolResults = await toolNode.invoke({ messages: [response] });
       
-      const toolMessages = toolResults.messages as AIMessage[];
+      const toolMessages = toolResults.messages as any[];
       const lastToolResult = toolMessages[toolMessages.length - 1];
       
       return {
